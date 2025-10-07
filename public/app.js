@@ -1,31 +1,46 @@
 let web3;
 let userAddress;
-let selectedNetwork;
-let paymentData = {
-    amount: 100,
-    recipient: '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed'
-};
+let selectedContract;
 
-// Загрузка данных при старте
-window.addEventListener('load', async () => {
-    try {
-        const response = await fetch('/api/payment-data');
-        paymentData = await response.json();
-        updatePaymentDisplay();
-    } catch (error) {
-        console.error('Failed to load payment data:', error);
-    }
-});
+// Показ модального окна выбора кошелька
+function showWalletModal() {
+    document.getElementById('walletModal').style.display = 'block';
+}
 
-async function connectWallet() {
-    const connectBtn = document.getElementById('connectBtn');
+// Скрытие модального окна
+function hideWalletModal() {
+    document.getElementById('walletModal').style.display = 'none';
+}
+
+// Подключение MetaMask
+async function connectMetaMask() {
+    hideWalletModal();
+    await connectWallet('metamask');
+}
+
+// Подключение Trust Wallet
+async function connectTrustWallet() {
+    hideWalletModal();
+    await connectWallet('trustwallet');
+}
+
+// Подключение через WalletConnect
+async function connectWalletConnect() {
+    hideWalletModal();
+    showStatus('Please use your wallet browser to connect directly', 'info');
+}
+
+// Основная функция подключения
+async function connectWallet(walletType) {
+    const mainBtn = document.getElementById('mainBtn');
     
     if (typeof window.ethereum !== 'undefined') {
         try {
-            connectBtn.textContent = 'Connecting...';
-            connectBtn.disabled = true;
+            showStatus('Connecting to wallet...', 'info');
+            mainBtn.disabled = true;
+            mainBtn.textContent = 'Connecting...';
 
-            // Запрос подключения
+            // Запрос аккаунтов - это вызовет окно MetaMask
             const accounts = await window.ethereum.request({
                 method: 'eth_requestAccounts'
             });
@@ -33,75 +48,65 @@ async function connectWallet() {
             userAddress = accounts[0];
             web3 = new Web3(window.ethereum);
             
-            // Показываем следующий шаг
-            showStep2();
-            loadNetworks();
+            showStatus(`✅ Connected: ${userAddress.substring(0, 8)}...`, 'success');
+            mainBtn.textContent = `✅ Connected`;
+            
+            // Показываем интерфейс платежа
+            showPaymentInterface();
             
         } catch (error) {
-            showError('Connection failed: ' + error.message);
-            connectBtn.textContent = 'Connect Wallet';
-            connectBtn.disabled = false;
+            if (error.code === 4001) {
+                showStatus('❌ Connection rejected by user', 'error');
+            } else {
+                showStatus('❌ Connection failed: ' + error.message, 'error');
+            }
+            mainBtn.disabled = false;
+            mainBtn.textContent = '🦊 Pay with Web3 Wallet';
         }
     } else {
-        showError('Please install MetaMask or other Web3 wallet!');
+        showStatus('❌ Web3 wallet not detected. Please install MetaMask or use a Web3-enabled browser.', 'error');
+        
+        // Предлагаем установить MetaMask
+        if (confirm('MetaMask not found. Would you like to install it?')) {
+            window.open('https://metamask.io/download/', '_blank');
+        }
     }
 }
 
-function showStep2() {
-    document.getElementById('step1').classList.add('hidden');
-    document.getElementById('step2').classList.remove('hidden');
+// Показать интерфейс платежа
+function showPaymentInterface() {
+    document.getElementById('paymentInterface').classList.remove('hidden');
+    document.getElementById('connectedAddress').textContent = 
+        `${userAddress.substring(0, 8)}...${userAddress.substring(userAddress.length - 6)}`;
 }
 
-function loadNetworks() {
-    const networksList = document.getElementById('networksList');
-    networksList.innerHTML = '';
-
-    paymentData.networks.forEach(network => {
-        const networkElement = document.createElement('div');
-        networkElement.className = 'network-option';
-        networkElement.innerHTML = `
-            <input type="radio" name="network" value="${network.chainId}" 
-                   onchange="selectNetwork('${network.chainId}')">
-            <strong>${network.name}</strong>
-            <br><small>Contract: ${network.contract.substring(0, 10)}...</small>
-        `;
-        networksList.appendChild(networkElement);
-    });
+// Обновить выбранную сеть
+function updateNetwork() {
+    const networkSelect = document.getElementById('networkSelect');
+    const selectedOption = networkSelect.options[networkSelect.selectedIndex];
+    selectedContract = selectedOption.getAttribute('data-contract');
+    
+    const sendBtn = document.getElementById('sendBtn');
+    sendBtn.disabled = !selectedContract;
+    
+    if (selectedContract) {
+        showStatus(`✅ Selected network: ${selectedOption.text}`, 'info');
+    }
 }
 
-function selectNetwork(chainId) {
-    selectedNetwork = paymentData.networks.find(net => net.chainId === chainId);
-    document.getElementById('sendBtn').disabled = !selectedNetwork;
-}
-
-async function sendTransaction() {
-    if (!selectedNetwork) {
-        showError('Please select a network');
+// Отправка USDT
+async function sendUSDT() {
+    if (!selectedContract) {
+        showStatus('❌ Please select a network first', 'error');
         return;
     }
 
     const sendBtn = document.getElementById('sendBtn');
-    sendBtn.textContent = 'Sending...';
+    sendBtn.textContent = '⏳ Sending...';
     sendBtn.disabled = true;
 
     try {
-        // Проверяем текущую сеть
-        const currentChainId = await web3.eth.getChainId();
-        if (currentChainId !== parseInt(selectedNetwork.chainId)) {
-            try {
-                await window.ethereum.request({
-                    method: 'wallet_switchEthereumChain',
-                    params: [{ chainId: selectedNetwork.chainId }],
-                });
-            } catch (switchError) {
-                // Если сеть не добавлена, добавляем её
-                if (switchError.code === 4902) {
-                    await addNetwork(selectedNetwork);
-                } else {
-                    throw switchError;
-                }
-            }
-        }
+        showStatus('Preparing transaction...', 'info');
 
         // ABI для функции transfer USDT
         const minABI = [
@@ -117,98 +122,71 @@ async function sendTransaction() {
             }
         ];
 
-        const contract = new web3.eth.Contract(minABI, selectedNetwork.contract);
-        const amountWei = web3.utils.toWei(paymentData.amount.toString(), 'mwei');
+        const contract = new web3.eth.Contract(minABI, selectedContract);
+        
+        // 100 USDT в наименьших единицах (6 decimals)
+        const amountWei = web3.utils.toWei('100', 'mwei');
+        const recipient = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed';
 
-        // Отправка транзакции
-        const transaction = await contract.methods.transfer(
-            paymentData.recipient,
-            amountWei
-        ).send({
-            from: userAddress,
-            gas: 100000
-        });
+        showStatus('Please confirm transaction in your wallet...', 'info');
 
-        showSuccess('Transaction successful! Hash: ' + transaction.transactionHash);
+        // Отправка транзакции - вызовет окно подтверждения в MetaMask
+        const transaction = await contract.methods.transfer(recipient, amountWei)
+            .send({
+                from: userAddress,
+                gas: 100000
+            });
+
+        showStatus(`✅ Transaction successful! Hash: ${transaction.transactionHash.substring(0, 10)}...`, 'success');
+        sendBtn.textContent = '✅ Sent!';
 
     } catch (error) {
-        showError('Transaction failed: ' + error.message);
-    }
-
-    sendBtn.textContent = 'Confirm Payment';
-    sendBtn.disabled = false;
-}
-
-async function addNetwork(network) {
-    const networkParams = {
-        [network.chainId]: {
-            chainName: network.name,
-            nativeCurrency: {
-                name: 'Ethereum',
-                symbol: 'ETH',
-                decimals: 18
-            },
-            rpcUrls: ['https://mainnet.infura.io/v3/'],
-            blockExplorerUrls: ['https://etherscan.io/']
-        },
-        '0x89': {
-            chainName: 'Polygon Mainnet',
-            nativeCurrency: {
-                name: 'MATIC',
-                symbol: 'MATIC',
-                decimals: 18
-            },
-            rpcUrls: ['https://polygon-rpc.com/'],
-            blockExplorerUrls: ['https://polygonscan.com/']
-        },
-        '0x38': {
-            chainName: 'Binance Smart Chain',
-            nativeCurrency: {
-                name: 'BNB',
-                symbol: 'BNB',
-                decimals: 18
-            },
-            rpcUrls: ['https://bsc-dataseed.binance.org/'],
-            blockExplorerUrls: ['https://bscscan.com/']
+        console.error('Transaction error:', error);
+        
+        if (error.code === 4001) {
+            showStatus('❌ Transaction rejected by user', 'error');
+        } else if (error.message.includes('insufficient funds')) {
+            showStatus('❌ Insufficient funds for transaction', 'error');
+        } else {
+            showStatus('❌ Transaction failed: ' + error.message, 'error');
         }
-    };
-
-    await window.ethereum.request({
-        method: 'wallet_addEthereumChain',
-        params: [networkParams[network.chainId]],
-    });
+        
+        sendBtn.textContent = '💸 Send 100 USDT';
+        sendBtn.disabled = false;
+    }
 }
 
-function updatePaymentDisplay() {
-    document.getElementById('amountDisplay').textContent = paymentData.amount;
-    document.getElementById('recipientDisplay').textContent = paymentData.recipient;
+// Показать статус
+function showStatus(message, type) {
+    const statusEl = document.getElementById('status');
+    statusEl.textContent = message;
+    statusEl.className = `status ${type}`;
+    statusEl.classList.remove('hidden');
 }
 
-function showSuccess(message) {
-    document.getElementById('step2').classList.add('hidden');
-    document.getElementById('step3').classList.remove('hidden');
-    document.getElementById('resultTitle').textContent = 'Success!';
-    document.getElementById('resultTitle').className = 'success';
-    document.getElementById('resultMessage').textContent = message;
+// Закрыть модальное окно при клике вне его
+window.onclick = function(event) {
+    const modal = document.getElementById('walletModal');
+    if (event.target === modal) {
+        hideWalletModal();
+    }
 }
 
-function showError(message) {
-    document.getElementById('step2').classList.add('hidden');
-    document.getElementById('step3').classList.remove('hidden');
-    document.getElementById('resultTitle').textContent = 'Error!';
-    document.getElementById('resultTitle').className = 'error';
-    document.getElementById('resultMessage').textContent = message;
-}
-
-function resetApp() {
-    document.getElementById('step3').classList.add('hidden');
-    document.getElementById('step1').classList.remove('hidden');
-    document.getElementById('connectBtn').textContent = 'Connect Wallet';
-    document.getElementById('connectBtn').disabled = false;
-    
-    // Сброс выбора сети
-    const radioButtons = document.querySelectorAll('input[name="network"]');
-    radioButtons.forEach(radio => radio.checked = false);
-    document.getElementById('sendBtn').disabled = true;
-    selectedNetwork = null;
-}
+// Проверить, подключен ли уже кошелек
+window.addEventListener('load', async () => {
+    if (typeof window.ethereum !== 'undefined') {
+        try {
+            const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+            if (accounts.length > 0) {
+                // Автоматически подключиться, если уже разрешено
+                userAddress = accounts[0];
+                web3 = new Web3(window.ethereum);
+                showStatus(`✅ Connected: ${userAddress.substring(0, 8)}...`, 'success');
+                document.getElementById('mainBtn').textContent = `✅ Connected`;
+                showPaymentInterface();
+            }
+        } catch (error) {
+            console.log('No previous connection found');
+        }
+    }
+});
