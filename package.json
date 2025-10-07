@@ -1,0 +1,11 @@
+{
+  "name": "crypto-payment-buttons",
+  "version": "1.0.0",
+  "description": "Static HTML with crypto payment buttons",
+  "scripts": {
+    "start": "npx serve -s"
+  },
+  "dependencies": {
+    "serve": "^14.0.0"
+  }
+}
