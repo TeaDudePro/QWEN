@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>USDT Payment</title>
+    <script src="https://cdn.jsdelivr.net/npm/web3@latest/dist/web3.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
+        button { padding: 15px 30px; font-size: 18px; margin: 10px; cursor: pointer; }
+        .container { border: 1px solid #ddd; padding: 20px; border-radius: 10px; }
+        .hidden { display: none; }
+        .network-option { padding: 10px; margin: 5px; border: 1px solid #ccc; cursor: pointer; }
+        .network-option:hover { background: #f0f0f0; }
+        .success { color: green; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>USDT Payment</h1>
+        
+        <!-- Шаг 1: Подключение кошелька -->
+        <div id="step1">
+            <h2>Connect Your Wallet</h2>
+            <button onclick="connectWallet()" id="connectBtn">Connect Wallet</button>
+        </div>
+
+        <!-- Шаг 2: Выбор сети и подтверждение -->
+        <div id="step2" class="hidden">
+            <h2>Payment Details</h2>
+            <p><strong>Amount:</strong> <span id="amountDisplay">100</span> USDT</p>
+            <p><strong>Recipient:</strong> <span id="recipientDisplay">0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed</span></p>
+            
+            <h3>Select Network:</h3>
+            <div id="networksList"></div>
+            
+            <button onclick="sendTransaction()" id="sendBtn" disabled>Confirm Payment</button>
+        </div>
+
+        <!-- Шаг 3: Результат -->
+        <div id="step3" class="hidden">
+            <h2 id="resultTitle">Transaction Result</h2>
+            <p id="resultMessage"></p>
+            <button onclick="resetApp()">New Payment</button>
+        </div>
+
+        <div id="status" class="hidden"></div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
