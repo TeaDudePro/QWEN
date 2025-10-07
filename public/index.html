@@ -7,45 +7,113 @@
     <script src="https://cdn.jsdelivr.net/npm/web3@latest/dist/web3.min.js"></script>
     <style>
         body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
-        button { padding: 15px 30px; font-size: 18px; margin: 10px; cursor: pointer; }
-        .container { border: 1px solid #ddd; padding: 20px; border-radius: 10px; }
+        button { padding: 15px 30px; font-size: 18px; margin: 10px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 5px; }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #6c757d; cursor: not-allowed; }
+        .container { border: 1px solid #ddd; padding: 30px; border-radius: 10px; text-align: center; }
         .hidden { display: none; }
-        .network-option { padding: 10px; margin: 5px; border: 1px solid #ccc; cursor: pointer; }
-        .network-option:hover { background: #f0f0f0; }
-        .success { color: green; }
-        .error { color: red; }
+        
+        /* Стили для модального окна */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            background-color: white;
+            margin: 15% auto;
+            padding: 30px;
+            border-radius: 10px;
+            width: 80%;
+            max-width: 500px;
+            text-align: center;
+        }
+        .wallet-option {
+            padding: 15px;
+            margin: 10px 0;
+            border: 2px solid #007bff;
+            border-radius: 8px;
+            cursor: pointer;
+            background: white;
+            transition: all 0.3s;
+        }
+        .wallet-option:hover {
+            background: #007bff;
+            color: white;
+        }
+        
+        .status {
+            margin: 20px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>USDT Payment</h1>
+        <h1>💳 USDT Payment</h1>
+        <p>Send <strong>100 USDT</strong> easily with your Web3 wallet</p>
         
-        <!-- Шаг 1: Подключение кошелька -->
-        <div id="step1">
+        <!-- Основная кнопка -->
+        <button onclick="showWalletModal()" id="mainBtn">
+            🦊 Pay with Web3 Wallet
+        </button>
+        
+        <!-- Статус -->
+        <div id="status" class="status hidden"></div>
+
+        <!-- Интерфейс транзакции -->
+        <div id="paymentInterface" class="hidden">
+            <h3>Payment Details</h3>
+            <p>Connected: <strong id="connectedAddress"></strong></p>
+            
+            <div class="network-selection">
+                <h4>Select Network:</h4>
+                <select id="networkSelect" onchange="updateNetwork()">
+                    <option value="">Choose network...</option>
+                    <option value="0x1" data-contract="0xdAC17F958D2ee523a2206206994597C13D831ec7">Ethereum (ERC-20)</option>
+                    <option value="0x89" data-contract="0xc2132D05D31c914a87C6611C10748AEb04B58e8F">Polygon</option>
+                    <option value="0x38" data-contract="0x55d398326f99059fF775485246999027B3197955">BNB Chain</option>
+                    <option value="0xa4b1" data-contract="0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9">Arbitrum</option>
+                </select>
+            </div>
+            
+            <button onclick="sendUSDT()" id="sendBtn" disabled>
+                💸 Send 100 USDT
+            </button>
+        </div>
+    </div>
+
+    <!-- Модальное окно выбора кошелька -->
+    <div id="walletModal" class="modal">
+        <div class="modal-content">
             <h2>Connect Your Wallet</h2>
-            <button onclick="connectWallet()" id="connectBtn">Connect Wallet</button>
-        </div>
-
-        <!-- Шаг 2: Выбор сети и подтверждение -->
-        <div id="step2" class="hidden">
-            <h2>Payment Details</h2>
-            <p><strong>Amount:</strong> <span id="amountDisplay">100</span> USDT</p>
-            <p><strong>Recipient:</strong> <span id="recipientDisplay">0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed</span></p>
+            <p>Choose your preferred Web3 wallet:</p>
             
-            <h3>Select Network:</h3>
-            <div id="networksList"></div>
+            <div class="wallet-option" onclick="connectMetaMask()">
+                🦊 MetaMask
+            </div>
             
-            <button onclick="sendTransaction()" id="sendBtn" disabled>Confirm Payment</button>
+            <div class="wallet-option" onclick="connectWalletConnect()">
+                🔗 WalletConnect (Other Wallets)
+            </div>
+            
+            <div class="wallet-option" onclick="connectTrustWallet()">
+                🔷 Trust Wallet
+            </div>
+            
+            <button onclick="hideWalletModal()" style="margin-top: 20px; background: #6c757d;">
+                Cancel
+            </button>
         </div>
-
-        <!-- Шаг 3: Результат -->
-        <div id="step3" class="hidden">
-            <h2 id="resultTitle">Transaction Result</h2>
-            <p id="resultMessage"></p>
-            <button onclick="resetApp()">New Payment</button>
-        </div>
-
-        <div id="status" class="hidden"></div>
     </div>
 
     <script src="app.js"></script>
